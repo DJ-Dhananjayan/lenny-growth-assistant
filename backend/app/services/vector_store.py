@@ -18,7 +18,20 @@ def search_chunks(db: Session, query: str, top_k: int = 4) -> List[Dict[str, Any
         return []
 
     results = []
-    query_words = set(query.lower().split())
+    stopwords = {
+        "the", "a", "an", "is", "are", "was", "were", "in", "on", "at", "to", "for", "of",
+        "with", "by", "from", "about", "into", "through", "after", "before", "under", "above",
+        "and", "or", "but", "so", "if", "then", "else", "when", "where", "why", "how", "what",
+        "which", "who", "whom", "whose", "this", "that", "these", "those", "it", "its", "you",
+        "your", "we", "our", "he", "she", "they", "them", "their", "can", "could", "will",
+        "would", "should", "have", "has", "had", "do", "does", "did", "tell", "give", "explain",
+        "describe", "write", "make", "podcast", "episode", "lenny", "lennys"
+    }
+    content_words = {
+        w.strip("?,.!;:\"'()")
+        for w in query.lower().split()
+        if len(w.strip("?,.!;:\"'()")) > 2 and w.strip("?,.!;:\"'()") not in stopwords
+    }
 
     for chunk in chunks:
         chunk_vector = chunk.embedding
@@ -35,9 +48,9 @@ def search_chunks(db: Session, query: str, top_k: int = 4) -> List[Dict[str, Any
         
         # Keyword match boost for guest name or specific terms
         boost = 0.0
-        if guest_name and any(w in guest_name.lower() for w in query_words if len(w) > 2):
+        if guest_name and any(w in guest_name.lower() for w in content_words):
             boost += 0.35
-        if episode_title and any(w in episode_title.lower() for w in query_words if len(w) > 2):
+        if episode_title and any(w in episode_title.lower() for w in content_words):
             boost += 0.20
 
         final_score = min(1.0, float(sim) + boost)

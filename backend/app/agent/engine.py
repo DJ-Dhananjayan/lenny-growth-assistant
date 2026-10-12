@@ -116,26 +116,93 @@ class LennyGrowthAgent:
             )
             return welcome_msg, [], None
 
-        # 2. Execute transcript vector search tool
-        all_chunks = search_chunks(self.db, query=clean_prompt, top_k=4)
+        # 2. Out-of-scope / Unrelated query handling
+        cookie_keywords = ["cookie", "cookies", "chocolate chip"]
+        recipe_keywords = ["recipe", "recipes", "bake", "baking", "cook", "cooking", "ingredient", "ingredients", "cake", "pasta", "pizza", "lasagna", "pie", "bread"]
+        
+        is_cookie_or_recipe = any(k in lowered for k in cookie_keywords) or (
+            any(k in lowered for k in recipe_keywords) and not any(term in lowered for term in ["growth", "product", "metric", "framework", "funnel", "loop", "strategy", "retention", "startup"])
+        )
+        if is_cookie_or_recipe:
+            out_of_scope_msg = (
+                "I'm designed to answer product, growth, and startup questions grounded in Lenny's Podcast. "
+                "I can't provide a cookie recipe, but I can help with a product or growth question."
+            )
+            return out_of_scope_msg, [], None
 
-        # 3. Filter relevant chunks by score threshold
-        relevant_chunks = [c for c in all_chunks if c.get("score", 0.0) >= 0.20]
-        if not relevant_chunks and all_chunks and all_chunks[0].get("score", 0.0) >= 0.15:
-            relevant_chunks = [all_chunks[0]]
+        out_of_domain_topics = {
+            "quantum physics": "quantum physics",
+            "black hole": "black hole thermodynamics",
+            "thermodynamics": "thermodynamics",
+            "weather": "weather forecasts",
+            "football": "sports scores",
+            "nba": "sports",
+            "nfl": "sports",
+            "world cup": "sports",
+            "capital of": "geography trivia",
+            "astronomy": "astronomy",
+            "faucet": "home repair",
+            "medical": "medical advice"
+        }
+        for kw, topic in out_of_domain_topics.items():
+            if kw in lowered:
+                out_of_domain_msg = (
+                    f"I'm designed to answer product, growth, and startup questions grounded in Lenny's Podcast. "
+                    f"I can't assist with {topic}, but I can help with a product or growth question."
+                )
+                return out_of_domain_msg, [], None
 
-        out_of_domain_keywords = ["quantum physics", "cooking recipe", "weather in tokyo", "football scores", "astronomy", "capital of france"]
-        is_out_of_domain = any(k in lowered for k in out_of_domain_keywords)
+        # 3. Contextual query formulation for follow-up turns
+        search_query = clean_prompt
+        if history_messages:
+            last_user_msgs = [m["content"] for m in history_messages if m.get("role") == "user"]
+            if last_user_msgs:
+                search_query = f"{last_user_msgs[-1]} {clean_prompt}"
 
-        # 4. Abstention if insufficient evidence
-        if (is_out_of_domain or not relevant_chunks) and not is_essay_request(clean_prompt) and not is_html_artifact_request(clean_prompt):
+        # 4. Execute transcript vector search tool
+        all_chunks = search_chunks(self.db, query=search_query, top_k=4)
+
+        # 5. Strict relevance & grounding check
+        grounding_stopwords = {
+            "the", "a", "an", "is", "are", "was", "were", "in", "on", "at", "to", "for", "of",
+            "with", "by", "from", "about", "into", "through", "after", "before", "under", "above",
+            "and", "or", "but", "so", "if", "then", "else", "when", "where", "why", "how", "what",
+            "which", "who", "whom", "whose", "this", "that", "these", "those", "it", "its", "you",
+            "your", "we", "our", "he", "she", "they", "them", "their", "can", "could", "will",
+            "would", "should", "have", "has", "had", "do", "does", "did", "tell", "give", "explain",
+            "describe", "write", "make", "podcast", "episode", "lenny", "lennys", "say", "says"
+        }
+        content_words = [
+            w.strip("?,.!;:\"'()")
+            for w in search_query.lower().split()
+            if len(w.strip("?,.!;:\"'()")) > 2 and w.strip("?,.!;:\"'()") not in grounding_stopwords
+        ]
+
+        relevant_chunks = []
+        for c in all_chunks:
+            chunk_score = c.get("score", 0.0)
+            text_corpus = (c.get("snippet", "") + " " + c.get("guest", "") + " " + c.get("episode_title", "")).lower()
+            matching_terms = [w for w in content_words if w in text_corpus]
+            # Grounded if strong vector score (>= 0.45) or content words match with decent score (>= 0.25)
+            if (chunk_score >= 0.45) or (len(matching_terms) >= 1 and chunk_score >= 0.25):
+                relevant_chunks.append(c)
+
+        # If there are grounded matches, only keep top matches close to top score to avoid irrelevant sources
+        if relevant_chunks:
+            top_score = relevant_chunks[0]["score"]
+            cutoff = max(0.25, top_score * 0.70)
+            relevant_chunks = [c for c in relevant_chunks if c["score"] >= cutoff]
+
+        # 6. Abstention if insufficient evidence
+        if not relevant_chunks and not is_essay_request(clean_prompt) and not is_html_artifact_request(clean_prompt):
             abstention_msg = (
                 "The available Lenny's Podcast transcripts do not contain sufficient evidence to answer this question reliably.\n\n"
                 "Currently ingested episodes include insights from:\n"
                 "• **Brian Chesky** (Airbnb) on Founder-Led Mode & Product Design\n"
                 "• **Shreyas Doshi** on the LNO Framework & Product Prioritization\n"
                 "• **Elad Gil** on High Growth & Distribution vs Product\n"
-                "• **Elena Verna** on Product-Led Growth (PLG) & Growth Loops"
+                "• **Elena Verna** on Product-Led Growth (PLG) & Growth Loops\n\n"
+                "Try asking about one of these topics, such as *'What is the LNO framework by Shreyas Doshi?'* or *'How does Brian Chesky explain Founder-Led Mode?'*"
             )
             return abstention_msg, [], None
 
