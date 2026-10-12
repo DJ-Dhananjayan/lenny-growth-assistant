@@ -1,0 +1,8 @@
+{
+  "episode_title": "Shreyas Doshi on the LNO Framework, Product Mindsets, and High-Leverage Leadership",
+  "guest": "Shreyas Doshi",
+  "episode_url": "https://www.lennyweekly.com/p/shreyas-doshi-product-leadership",
+  "episode_num": 88,
+  "publish_date": "2023-04-18",
+  "transcript": "Lenny: Welcome back to Lenny's Podcast. My guest today is Shreyas Doshi, former Product Leader at Stripe, Twitter, Google, and Yahoo. Shreyas, your frameworks have transformed how product managers operate. Let's start with the LNO framework.\n\nShreyas Doshi: Thanks Lenny. The LNO framework stands for Leverage, Neutral, and Overhead tasks. Most product managers fall into the trap of trying to achieve 100% perfection on every task on their to-do list. That leads to burnout and mediocre outcomes because not all tasks are created equal.\n\nLeverage tasks (L) are tasks where doing an extraordinary job produces 10x output—such as product strategy, key architecture decisions, and high-impact positioning. You should spend 80% of your creative energy here and aim for 10/10 quality.\n\nNeutral tasks (N) are standard tasks where doing a solid job (7/10 quality) is expected and sufficient, like routine weekly updates or basic feature specs. Doing 10/10 work here is wasted leverage.\n\nOverhead tasks (O) are administrative tasks where doing a passable job (5/10 quality) as quickly as possible is optimal. If you spend equal effort on O tasks as L tasks, you are actively degrading your high-leverage impact."
+}
